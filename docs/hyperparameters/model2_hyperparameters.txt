@@ -1,0 +1,11 @@
+Model 2 Hyperparameters
+=======================
+
+Use this file to record:
+- image size
+- batch size
+- number of epochs
+- optimizer
+- learning rate
+- loss function
+- architecture notes

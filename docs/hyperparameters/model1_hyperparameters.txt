@@ -1,0 +1,10 @@
+Model 1 Hyperparameters
+=======================
+
+Use this file to record:
+- kernel sizes
+- pooling sizes
+- stride choices
+- number of extracted features
+- K-means settings
+- any experiment notes

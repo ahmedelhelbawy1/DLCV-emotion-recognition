@@ -1,0 +1,39 @@
+Model 2 Hyperparameters
+=======================
+
+Image size:
+512 x 512
+
+Batch size:
+8
+
+Number of epochs:
+10
+
+Optimizer:
+Adam
+
+Learning rate:
+0.001
+
+Loss function:
+CrossEntropyLoss
+
+Device:
+CUDA if available, otherwise CPU
+
+Model architecture summary:
+- Conv1: in_channels=3, out_channels=32, kernel_size=3, ReLU, MaxPool2d(2x2)
+- Conv2: in_channels=32, out_channels=64, kernel_size=3, ReLU, MaxPool2d(2x2)
+- Conv3: in_channels=64, out_channels=64, kernel_size=3, ReLU, MaxPool2d(2x2)
+- Conv4: in_channels=64, out_channels=32, kernel_size=5, ReLU
+- Conv5: in_channels=32, out_channels=16, kernel_size=7, ReLU
+- Flatten
+- Fully connected hidden layer: 128 neurons, Sigmoid activation
+- Output layer: 4 logits for angry, happy, sad, surprise
+
+Reason for these choices:
+- The assignment already fixed the image size at 512 x 512.
+- Batch size 8 is small enough to be safer for memory, especially with large images.
+- Adam was used because it is simple and works well for CNN training.
+- CrossEntropyLoss was used because this is a 4-class classification problem.

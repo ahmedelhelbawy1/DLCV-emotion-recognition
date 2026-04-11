@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.DS_Store
+outputs/models/*.pth
+outputs/models/*.pkl
+outputs/logs/
+outputs/predictions/
+.ipynb_checkpoints/

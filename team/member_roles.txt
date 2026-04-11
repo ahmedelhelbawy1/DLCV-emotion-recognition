@@ -1,0 +1,20 @@
+Member Roles
+============
+
+Member 1:
+- dataset preparation
+- duplicate removal
+- resizing
+- train/val/test split
+
+Member 2:
+- Model 1 convolution layer
+
+Member 3:
+- Model 1 pooling, activation, flattening, feature extraction, K-means, and pipeline integration
+
+Member 4:
+- Model 2 CNN using PyTorch
+
+Member 5:
+- evaluation, plots, confusion matrix, K-fold validation, comparison, report, presentation, and final integration

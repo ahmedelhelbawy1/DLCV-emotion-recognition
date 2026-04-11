@@ -1,0 +1,46 @@
+Dataset Preparation Summary
+===========================
+
+Benchmark dataset: FER2013-balanced
+Source folder: /private/tmp/fer2013_balanced_selected_stream
+Selected classes: angry, happy, sad, surprise
+Target size: 512 x 512 x 3
+Split ratio: 70/20/10
+
+Per-class summary:
+- angry
+  original images: 3049
+  duplicates removed: 41
+  images after cleaning: 3008
+  train images: 2105
+  val images: 601
+  test images: 302
+- happy
+  original images: 3049
+  duplicates removed: 14
+  images after cleaning: 3035
+  train images: 2124
+  val images: 607
+  test images: 304
+- sad
+  original images: 3049
+  duplicates removed: 16
+  images after cleaning: 3033
+  train images: 2123
+  val images: 606
+  test images: 304
+- surprise
+  original images: 3049
+  duplicates removed: 108
+  images after cleaning: 2941
+  train images: 2058
+  val images: 588
+  test images: 295
+
+Overall summary:
+- total original images: 12196
+- total duplicates removed: 179
+- total cleaned images: 12017
+- total train images: 8410
+- total val images: 2402
+- total test images: 1205

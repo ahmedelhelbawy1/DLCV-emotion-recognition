@@ -1,0 +1,8 @@
+Report Notes
+============
+
+Use this file for:
+- report outline
+- experiment notes
+- results summary
+- writing reminders for the final report

@@ -1,0 +1,8 @@
+Presentation Notes
+==================
+
+Use this file for:
+- speaking points
+- slide flow
+- who presents which section
+- demo notes

@@ -1,0 +1,7 @@
+Contribution Notes
+==================
+
+Use this file to keep short notes about:
+- who created which files
+- who reviewed which parts
+- what was merged into the final submission
