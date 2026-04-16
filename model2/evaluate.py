@@ -1,20 +1,25 @@
 """Evaluate the saved Model 2 CNN on the test set."""
 
+import argparse
 from pathlib import Path
 import sys
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
+import matplotlib
+
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from sklearn.metrics import classification_report, confusion_matrix
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Dataset, Subset
 from torchvision import datasets, transforms
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from evaluation.confusion_matrix import write_confusion_matrix_report
 from model2.model2_emotion_cnn import EmotionCNN
 from model2.utils import ensure_dir, get_device
 
@@ -25,11 +30,24 @@ NUM_CLASSES = 4
 HIDDEN_FEATURES = 128
 
 
-def get_test_transform() -> transforms.Compose:
+def parse_args() -> argparse.Namespace:
+    """Read evaluation settings from the command line."""
+    parser = argparse.ArgumentParser(description="Evaluate Model 2 CNN.")
+    parser.add_argument(
+        "--model-path",
+        type=Path,
+        default=PROJECT_ROOT / "outputs" / "models" / "best_model2.pth",
+    )
+    parser.add_argument("--batch-size", type=int, default=BATCH_SIZE)
+    parser.add_argument("--max-test-samples", type=int, default=None)
+    return parser.parse_args()
+
+
+def get_test_transform(image_size: int) -> transforms.Compose:
     """Use the same image preprocessing during testing."""
     return transforms.Compose(
         [
-            transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
+            transforms.Resize((image_size, image_size)),
             transforms.ToTensor(),
             transforms.Normalize(
                 mean=[0.485, 0.456, 0.406],
@@ -39,7 +57,43 @@ def get_test_transform() -> transforms.Compose:
     )
 
 
-def load_test_dataset() -> datasets.ImageFolder:
+def limit_dataset(dataset: Dataset, max_samples: Optional[int]) -> Dataset:
+    """Use a smaller balanced subset when we need a quick local test."""
+    if max_samples is None or max_samples >= len(dataset):
+        return dataset
+
+    if hasattr(dataset, "targets"):
+        targets = dataset.targets
+        class_indices = {}
+
+        for index, target in enumerate(targets):
+            class_indices.setdefault(target, []).append(index)
+
+        samples_per_class = max_samples // len(class_indices)
+        selected_indices = []
+
+        for target in sorted(class_indices):
+            selected_indices.extend(class_indices[target][:samples_per_class])
+
+        remaining = max_samples - len(selected_indices)
+        if remaining > 0:
+            used_indices = set(selected_indices)
+            for index in range(len(dataset)):
+                if index not in used_indices:
+                    selected_indices.append(index)
+                    remaining -= 1
+                if remaining == 0:
+                    break
+
+        return Subset(dataset, selected_indices)
+
+    return Subset(dataset, list(range(max_samples)))
+
+
+def load_test_dataset(
+    image_size: int,
+    max_test_samples: Optional[int],
+) -> Tuple[Dataset, List[str], int]:
     """Load the test dataset and print some basic information."""
     test_dir = PROJECT_ROOT / "dataset" / "test"
 
@@ -49,7 +103,10 @@ def load_test_dataset() -> datasets.ImageFolder:
             "Please make sure dataset/test exists."
         )
 
-    test_dataset = datasets.ImageFolder(root=test_dir, transform=get_test_transform())
+    test_dataset = datasets.ImageFolder(
+        root=test_dir,
+        transform=get_test_transform(image_size),
+    )
 
     print(f"Test classes found: {test_dataset.classes}")
     print(f"Number of test images: {len(test_dataset)}")
@@ -57,13 +114,20 @@ def load_test_dataset() -> datasets.ImageFolder:
     if len(test_dataset) == 0:
         raise ValueError("The test dataset is empty.")
 
-    return test_dataset
+    class_names = test_dataset.classes
+    full_test_size = len(test_dataset)
+    test_dataset = limit_dataset(test_dataset, max_test_samples)
+
+    if max_test_samples is not None:
+        print(f"Quick run test images used: {len(test_dataset)}")
+
+    return test_dataset, class_names, full_test_size
 
 
 def load_trained_model(
     model_path: Path,
     device: torch.device,
-) -> Tuple[EmotionCNN, List[str]]:
+) -> Tuple[EmotionCNN, List[str], int]:
     """Load the saved best checkpoint from training."""
     if not model_path.exists():
         raise FileNotFoundError(
@@ -92,7 +156,7 @@ def load_trained_model(
         model.load_state_dict(checkpoint)
 
     model.eval()
-    return model, class_names
+    return model, class_names, input_size
 
 
 def plot_confusion_matrix(
@@ -131,26 +195,33 @@ def plot_confusion_matrix(
 
 def main() -> None:
     """Run evaluation and save the final reports."""
+    args = parse_args()
     device = get_device()
     print(f"Using device: {device}")
-    print("Loading test data...")
 
-    test_dataset = load_test_dataset()
+    model, checkpoint_classes, input_size = load_trained_model(
+        model_path=args.model_path,
+        device=device,
+    )
+    print("Saved model loaded successfully.")
+    print(f"Checkpoint image size: {input_size}x{input_size}")
+
+    print("Loading test data...")
+    test_dataset, test_class_names, full_test_size = load_test_dataset(
+        image_size=input_size,
+        max_test_samples=args.max_test_samples,
+    )
     test_loader = DataLoader(
         test_dataset,
-        batch_size=BATCH_SIZE,
+        batch_size=args.batch_size,
         shuffle=False,
         num_workers=0,
     )
 
-    model_path = PROJECT_ROOT / "outputs" / "models" / "best_model2.pth"
-    model, checkpoint_classes = load_trained_model(model_path=model_path, device=device)
-    print("Saved model loaded successfully.")
-
-    if checkpoint_classes != test_dataset.classes:
+    if checkpoint_classes != test_class_names:
         print("Warning: Class names in the saved model and test dataset do not match.")
         print(f"Checkpoint classes: {checkpoint_classes}")
-        print(f"Test dataset classes: {test_dataset.classes}")
+        print(f"Test dataset classes: {test_class_names}")
 
     all_labels = []
     all_predictions = []
@@ -175,7 +246,7 @@ def main() -> None:
     report = classification_report(
         all_labels,
         all_predictions,
-        target_names=test_dataset.classes,
+        target_names=test_class_names,
         digits=4,
         zero_division=0,
     )
@@ -188,10 +259,11 @@ def main() -> None:
     confusion_matrix_path = plots_output_dir / "confusion_matrix_model2.png"
     classification_report_path = reports_output_dir / "classification_report.txt"
     test_results_path = reports_output_dir / "test_results.txt"
+    confusion_matrix_report_path = reports_output_dir / "confusion_matrix_report_model2.txt"
 
     plot_confusion_matrix(
         cm=cm,
-        class_names=test_dataset.classes,
+        class_names=test_class_names,
         save_path=confusion_matrix_path,
     )
 
@@ -201,15 +273,22 @@ def main() -> None:
         f"{report}"
     )
     classification_report_path.write_text(classification_report_text, encoding="utf-8")
+    write_confusion_matrix_report(
+        confusion_matrix=cm,
+        class_names=test_class_names,
+        save_path=confusion_matrix_report_path,
+    )
 
     test_results_text = (
         "Model 2 Test Results\n"
         "====================\n"
         f"Test Accuracy: {test_accuracy:.2f}%\n"
-        f"Number of Test Images: {len(test_dataset)}\n"
-        f"Classes: {', '.join(test_dataset.classes)}\n"
-        f"Saved Model Path: {model_path}\n"
+        f"Number of Test Images Used: {len(test_dataset)}\n"
+        f"Full Test Dataset Size: {full_test_size}\n"
+        f"Classes: {', '.join(test_class_names)}\n"
+        f"Saved Model Path: {args.model_path}\n"
         f"Confusion Matrix Path: {confusion_matrix_path}\n"
+        f"Confusion Matrix Report Path: {confusion_matrix_report_path}\n"
         f"Classification Report Path: {classification_report_path}\n"
     )
     test_results_path.write_text(test_results_text, encoding="utf-8")
@@ -219,6 +298,7 @@ def main() -> None:
     print("\nClassification Report:")
     print(report)
     print(f"Confusion matrix saved to: {confusion_matrix_path}")
+    print(f"Confusion matrix report saved to: {confusion_matrix_report_path}")
     print(f"Classification report saved to: {classification_report_path}")
     print(f"Test summary saved to: {test_results_path}")
 

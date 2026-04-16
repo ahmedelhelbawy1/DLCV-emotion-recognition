@@ -1,11 +1,77 @@
 Model 2 Hyperparameters
 =======================
 
-Use this file to record:
-- image size
-- batch size
-- number of epochs
-- optimizer
-- learning rate
-- loss function
-- architecture notes
+Task
+----
+Emotion classification using four classes:
+- angry
+- happy
+- sad
+- surprise
+
+Libraries used
+--------------
+- Python
+- PyTorch
+- torchvision
+- matplotlib
+- scikit-learn
+- NumPy
+- Pillow
+
+Dataset settings
+----------------
+- Dataset source: public benchmark emotion dataset
+- Image size: 512 x 512 x 3
+- Dataset split: 70% training, 20% validation, 10% testing
+- Final experiment subset: 1000 images per class in total
+- Training samples used: 2800
+- Validation samples used: 800
+- Test samples used: 400
+
+Training hyperparameters
+------------------------
+- Batch size: 8
+- Number of epochs: 10
+- Optimizer: Adam
+- Learning rate: 0.0001
+- Weight decay: 0.0001
+- Label smoothing: 0.05
+- Loss function: CrossEntropyLoss
+- Device: CPU
+- Hidden layer size: 256 neurons
+
+Training augmentation
+---------------------
+Training-only augmentation was used:
+- Random horizontal flip
+- Small random rotation
+- Small brightness and contrast changes
+
+Architecture summary
+--------------------
+- Input: 512 x 512 x 3
+- Conv1: 3 input channels to 32 filters, kernel size 3 x 3, valid convolution
+- ReLU
+- MaxPool2d: 2 x 2
+- Conv2: 32 filters to 64 filters, kernel size 3 x 3, valid convolution
+- ReLU
+- MaxPool2d: 2 x 2
+- Conv3: 64 filters to 64 filters, kernel size 3 x 3, valid convolution
+- ReLU
+- MaxPool2d: 2 x 2
+- Conv4: 64 filters to 32 filters, kernel size 5 x 5, valid convolution
+- ReLU
+- Conv5: 32 filters to 16 filters, kernel size 7 x 7, valid convolution
+- ReLU
+- Flatten: 52 x 52 x 16 = 43,264 features
+- Fully connected hidden layer: 43,264 to 256
+- Sigmoid activation
+- Output layer: 256 to 4 logits
+- Softmax is used only during inference/reporting when probabilities are needed
+
+Final results
+-------------
+- Best validation accuracy: 56.50%
+- Final test accuracy: 56.75%
+- Average K-fold accuracy: 31.05%

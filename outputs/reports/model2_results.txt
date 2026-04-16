@@ -1,0 +1,274 @@
+Model 2 Results and Explanation
+===============================
+
+Project task
+------------
+Model 2 is the PyTorch CNN model for emotion classification. The goal is to classify face images into one of four emotion classes:
+
+- angry
+- happy
+- sad
+- surprise
+
+This model follows the assignment requirement of using a deep learning library to build and train a CNN for image classification.
+
+
+Dataset used
+------------
+The dataset was prepared from a public benchmark emotion dataset and organized into separate folders for each class. The images were resized to 512 x 512 x 3 and split into training, validation, and testing folders.
+
+The original prepared dataset contains:
+
+- Training images: 8410
+- Validation images: 2402
+- Test images: 1205
+
+For the final CPU-feasible Model 2 experiment, we used a balanced subset based on 1000 images per class in total:
+
+- Training images used: 2800 images
+- Validation images used: 800 images
+- Test images used: 400 images
+
+This means the testing stage used 100 images per class.
+
+
+Preprocessing
+-------------
+The following preprocessing steps were used:
+
+- Resize each image to 512 x 512.
+- Convert each image to a PyTorch tensor.
+- Normalize using standard RGB mean and standard deviation values.
+- During training only, light augmentation was added to improve generalization:
+  - Random horizontal flip
+  - Small random rotation
+  - Small brightness and contrast changes
+
+Validation and testing did not use random augmentation because they should measure the model on stable, unchanged images.
+
+
+Model architecture
+------------------
+The CNN architecture follows the required Model 2 design:
+
+- Conv1: 3 input channels to 32 filters, kernel size 3 x 3
+- ReLU
+- MaxPool2d with 2 x 2 kernel
+- Conv2: 32 filters to 64 filters, kernel size 3 x 3
+- ReLU
+- MaxPool2d with 2 x 2 kernel
+- Conv3: 64 filters to 64 filters, kernel size 3 x 3
+- ReLU
+- MaxPool2d with 2 x 2 kernel
+- Conv4: 64 filters to 32 filters, kernel size 5 x 5
+- ReLU
+- Conv5: 32 filters to 16 filters, kernel size 7 x 7
+- ReLU
+- Flatten
+- Fully connected hidden layer with 256 hidden features
+- Sigmoid activation
+- Final fully connected output layer with 4 output logits
+
+Valid convolution was used because no padding was added to the convolution layers.
+
+During training, CrossEntropyLoss was used. This is correct because the model outputs raw logits and the loss function internally handles the softmax operation.
+
+
+Training settings
+-----------------
+The final Model 2 training settings were:
+
+- Image size: 512 x 512
+- Batch size: 8
+- Epochs: 10
+- Optimizer: Adam
+- Learning rate: 0.0001
+- Weight decay: 0.0001
+- Label smoothing: 0.05
+- Hidden features: 256
+- Device used: CPU
+- Loss function: CrossEntropyLoss
+- Training samples: 2800
+- Validation samples: 800
+
+The best model was saved based on the highest validation accuracy.
+
+Saved model path:
+outputs/models/best_model2.pth
+
+
+Training and validation results
+-------------------------------
+The model was trained for 10 epochs. Validation was performed after every epoch.
+
+Epoch 1:
+- Train loss: 1.2741
+- Train accuracy: 38.54%
+- Validation loss: 1.2165
+- Validation accuracy: 44.12%
+
+Epoch 2:
+- Train loss: 1.1674
+- Train accuracy: 48.96%
+- Validation loss: 1.1853
+- Validation accuracy: 47.00%
+
+Epoch 3:
+- Train loss: 1.1003
+- Train accuracy: 53.93%
+- Validation loss: 1.1683
+- Validation accuracy: 48.75%
+
+Epoch 4:
+- Train loss: 1.0590
+- Train accuracy: 56.89%
+- Validation loss: 1.1133
+- Validation accuracy: 51.25%
+
+Epoch 5:
+- Train loss: 1.0076
+- Train accuracy: 60.21%
+- Validation loss: 1.0819
+- Validation accuracy: 55.88%
+
+Epoch 6:
+- Train loss: 0.9709
+- Train accuracy: 62.00%
+- Validation loss: 1.0744
+- Validation accuracy: 55.88%
+
+Epoch 7:
+- Train loss: 0.9469
+- Train accuracy: 61.79%
+- Validation loss: 1.0797
+- Validation accuracy: 53.88%
+
+Epoch 8:
+- Train loss: 0.9104
+- Train accuracy: 64.32%
+- Validation loss: 1.0999
+- Validation accuracy: 56.25%
+
+Epoch 9:
+- Train loss: 0.8637
+- Train accuracy: 68.14%
+- Validation loss: 1.1011
+- Validation accuracy: 55.62%
+
+Epoch 10:
+- Train loss: 0.8245
+- Train accuracy: 70.75%
+- Validation loss: 1.0802
+- Validation accuracy: 56.50%
+
+Best validation accuracy:
+56.50%
+
+The training accuracy increased from 38.54% to 70.75%, which shows that the model learned useful patterns from the training data. The best validation accuracy was 56.50%, which is clearly better than the random baseline of 25% for four balanced classes.
+
+
+Test results
+------------
+After training, the best saved model was evaluated on the test set.
+
+Final test accuracy:
+56.75%
+
+Number of test images used:
+400
+
+Full test dataset size:
+1205
+
+Classes:
+angry, happy, sad, surprise
+
+The test accuracy is close to the validation accuracy, which means the validation result was realistic and the model did not only memorize the validation set.
+
+
+Classification report
+---------------------
+The final classification report was:
+
+              precision    recall  f1-score   support
+
+       angry     0.5310    0.6000    0.5634       100
+       happy     0.6966    0.6200    0.6561       100
+         sad     0.3837    0.3300    0.3548       100
+    surprise     0.6429    0.7200    0.6792       100
+
+    accuracy                         0.5675       400
+   macro avg     0.5635    0.5675    0.5634       400
+weighted avg     0.5635    0.5675    0.5634       400
+
+The strongest class was surprise with 72.00% recall. The weakest class was sad with 33.00% recall, which means the model confused sad images more often than the other classes.
+
+
+Confusion matrix summary
+------------------------
+The confusion matrix report showed the following per-class results:
+
+- angry: 60.00%
+- happy: 62.00%
+- sad: 33.00%
+- surprise: 72.00%
+
+Overall accuracy:
+56.75%
+
+Overall error rate:
+43.25%
+
+The diagonal values in the confusion matrix represent correct predictions. Off-diagonal values represent wrong predictions. The results show that the model no longer predicts only one class. It learned to predict all four emotion classes, but sad was still the hardest class.
+
+
+K-fold validation
+-----------------
+K-fold validation was also performed for Model 2.
+
+Settings:
+
+- K value: 4
+- Epochs per fold: 1
+- Batch size: 8
+- Image size: 512 x 512
+- Learning rate: 0.001
+- Samples used in K-fold: 4000
+
+A balanced subset of 1000 images per class was used for K-fold validation to satisfy the dataset requirement while keeping the experiment feasible on a CPU-only machine.
+
+K-fold results:
+
+- Fold 1 accuracy: 38.20%
+- Fold 2 accuracy: 24.80%
+- Fold 3 accuracy: 25.60%
+- Fold 4 accuracy: 35.60%
+
+Average K-fold accuracy:
+31.05%
+
+The K-fold score is lower than the final trained model result because each fold was trained for only 1 epoch to keep runtime manageable on CPU. The final Model 2 result is based on the full 10-epoch training run.
+
+
+Generated output files
+----------------------
+The following important outputs were generated:
+
+- outputs/models/best_model2.pth
+- outputs/plots/train_loss.png
+- outputs/plots/val_loss.png
+- outputs/plots/train_accuracy.png
+- outputs/plots/val_accuracy.png
+- outputs/plots/confusion_matrix_model2.png
+- outputs/plots/model2/accuracy_vs_iterations_model2.png
+- outputs/plots/model2/kfold_accuracy_model2.png
+- outputs/reports/test_results.txt
+- outputs/reports/classification_report.txt
+- outputs/reports/confusion_matrix_report_model2.txt
+- outputs/reports/kfold_results_model2.txt
+- outputs/reports/model2_results.txt
+
+
+Conclusion
+----------
+Model 2 was successfully trained, validated, and tested using PyTorch. The final test accuracy was 56.75%, which is above the 25% random baseline for four classes. The model performed best on surprise and happy, while sad was the most difficult class. Overall, the implementation satisfies the assignment requirements for Model 2, including CNN training, validation, testing, accuracy plots, confusion matrix, classification report, and K-fold validation.

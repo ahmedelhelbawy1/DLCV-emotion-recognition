@@ -1,20 +1,26 @@
 """Train Model 2 for emotion classification."""
 
+import argparse
 from pathlib import Path
+import random
 import sys
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
+import matplotlib
+
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Dataset, Subset
 from torchvision import datasets, transforms
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from evaluation.plots import plot_accuracy_vs_iterations
 from model2.model2_emotion_cnn import EmotionCNN
 from model2.utils import (
     calculate_accuracy,
@@ -34,12 +40,51 @@ HIDDEN_FEATURES = 128
 SEED = 42
 
 
-def get_data_transforms() -> transforms.Compose:
-    """Use the same preprocessing for train and validation images."""
-    return transforms.Compose(
+def parse_args() -> argparse.Namespace:
+    """Read training settings from the command line."""
+    parser = argparse.ArgumentParser(description="Train Model 2 CNN.")
+    parser.add_argument("--image-size", type=int, default=IMAGE_SIZE)
+    parser.add_argument("--batch-size", type=int, default=BATCH_SIZE)
+    parser.add_argument("--epochs", type=int, default=NUM_EPOCHS)
+    parser.add_argument("--learning-rate", type=float, default=LEARNING_RATE)
+    parser.add_argument("--hidden-features", type=int, default=HIDDEN_FEATURES)
+    parser.add_argument("--weight-decay", type=float, default=0.0)
+    parser.add_argument("--label-smoothing", type=float, default=0.0)
+    parser.add_argument("--max-train-samples", type=int, default=None)
+    parser.add_argument("--max-val-samples", type=int, default=None)
+    parser.add_argument(
+        "--model-output-path",
+        type=Path,
+        default=PROJECT_ROOT / "outputs" / "models" / "best_model2.pth",
+    )
+    parser.add_argument(
+        "--use-augmentation",
+        action="store_true",
+        help="Use simple training-only augmentation to help the CNN generalize.",
+    )
+    return parser.parse_args()
+
+
+def get_data_transforms(image_size: int, is_training: bool, use_augmentation: bool) -> transforms.Compose:
+    """Build the image preprocessing steps for train or validation."""
+    transform_steps = [
+        # The assignment says images should be 512x512.
+        transforms.Resize((image_size, image_size)),
+    ]
+
+    if is_training and use_augmentation:
+        # These light changes make training images slightly different each epoch.
+        # This can help the model avoid memorizing one simple pattern.
+        transform_steps.extend(
+            [
+                transforms.RandomHorizontalFlip(p=0.5),
+                transforms.RandomRotation(degrees=10),
+                transforms.ColorJitter(brightness=0.15, contrast=0.15),
+            ]
+        )
+
+    transform_steps.extend(
         [
-            # The assignment says images should be 512x512.
-            transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
             transforms.ToTensor(),
             # Standard normalization values for RGB images.
             transforms.Normalize(
@@ -48,6 +93,8 @@ def get_data_transforms() -> transforms.Compose:
             ),
         ]
     )
+
+    return transforms.Compose(transform_steps)
 
 
 def validate_dataset_folder(folder_path: Path, folder_name: str) -> None:
@@ -59,7 +106,49 @@ def validate_dataset_folder(folder_path: Path, folder_name: str) -> None:
         )
 
 
-def load_datasets() -> Tuple[datasets.ImageFolder, datasets.ImageFolder]:
+def limit_dataset(dataset: Dataset, max_samples: Optional[int]) -> Dataset:
+    """Use a smaller balanced subset when we need a quick local run."""
+    if max_samples is None or max_samples >= len(dataset):
+        return dataset
+
+    if hasattr(dataset, "targets"):
+        targets = dataset.targets
+        class_indices = {}
+
+        for index, target in enumerate(targets):
+            class_indices.setdefault(target, []).append(index)
+
+        random_generator = random.Random(SEED)
+        for indices in class_indices.values():
+            random_generator.shuffle(indices)
+
+        samples_per_class = max_samples // len(class_indices)
+        selected_indices = []
+
+        for target in sorted(class_indices):
+            selected_indices.extend(class_indices[target][:samples_per_class])
+
+        remaining = max_samples - len(selected_indices)
+        if remaining > 0:
+            used_indices = set(selected_indices)
+            for index in range(len(dataset)):
+                if index not in used_indices:
+                    selected_indices.append(index)
+                    remaining -= 1
+                if remaining == 0:
+                    break
+
+        return Subset(dataset, selected_indices)
+
+    return Subset(dataset, list(range(max_samples)))
+
+
+def load_datasets(
+    image_size: int,
+    max_train_samples: Optional[int],
+    max_val_samples: Optional[int],
+    use_augmentation: bool,
+) -> Tuple[Dataset, Dataset, List[str]]:
     """Load train and validation data from the dataset folder."""
     train_dir = PROJECT_ROOT / "dataset" / "train"
     val_dir = PROJECT_ROOT / "dataset" / "val"
@@ -67,12 +156,21 @@ def load_datasets() -> Tuple[datasets.ImageFolder, datasets.ImageFolder]:
     validate_dataset_folder(train_dir, "train")
     validate_dataset_folder(val_dir, "val")
 
-    transform = get_data_transforms()
+    train_transform = get_data_transforms(
+        image_size=image_size,
+        is_training=True,
+        use_augmentation=use_augmentation,
+    )
+    val_transform = get_data_transforms(
+        image_size=image_size,
+        is_training=False,
+        use_augmentation=False,
+    )
 
     # ImageFolder works well here because the dataset is already split
     # into class-based folders like angry/, happy/, sad/, surprise/.
-    train_dataset = datasets.ImageFolder(root=train_dir, transform=transform)
-    val_dataset = datasets.ImageFolder(root=val_dir, transform=transform)
+    train_dataset = datasets.ImageFolder(root=train_dir, transform=train_transform)
+    val_dataset = datasets.ImageFolder(root=val_dir, transform=val_transform)
 
     print(f"Training classes found: {train_dataset.classes}")
     print(f"Validation classes found: {val_dataset.classes}")
@@ -90,23 +188,34 @@ def load_datasets() -> Tuple[datasets.ImageFolder, datasets.ImageFolder]:
             "Class names in training and validation folders do not match."
         )
 
-    return train_dataset, val_dataset
+    class_names = train_dataset.classes
+    train_dataset = limit_dataset(train_dataset, max_train_samples)
+    val_dataset = limit_dataset(val_dataset, max_val_samples)
+
+    if max_train_samples is not None:
+        print(f"Quick run training images used: {len(train_dataset)}")
+
+    if max_val_samples is not None:
+        print(f"Quick run validation images used: {len(val_dataset)}")
+
+    return train_dataset, val_dataset, class_names
 
 
 def create_dataloaders(
-    train_dataset: datasets.ImageFolder,
-    val_dataset: datasets.ImageFolder,
+    train_dataset: Dataset,
+    val_dataset: Dataset,
+    batch_size: int,
 ) -> Tuple[DataLoader, DataLoader]:
     """Wrap datasets in dataloaders so batches can be read easily."""
     train_loader = DataLoader(
         train_dataset,
-        batch_size=BATCH_SIZE,
+        batch_size=batch_size,
         shuffle=True,
         num_workers=0,
     )
     val_loader = DataLoader(
         val_dataset,
-        batch_size=BATCH_SIZE,
+        batch_size=batch_size,
         shuffle=False,
         num_workers=0,
     )
@@ -176,13 +285,14 @@ def validate_one_epoch(
     dataloader: DataLoader,
     criterion: nn.Module,
     device: torch.device,
-) -> Tuple[float, float]:
+) -> Tuple[float, float, List[int]]:
     """Check model performance on the validation set."""
     model.eval()
 
     running_loss = 0.0
     running_accuracy = 0.0
     total_samples = 0
+    prediction_counts = [0 for _ in range(NUM_CLASSES)]
 
     with torch.no_grad():
         for images, labels in dataloader:
@@ -198,55 +308,88 @@ def validate_one_epoch(
             running_accuracy += batch_accuracy * labels.size(0)
             total_samples += labels.size(0)
 
+            predictions = torch.argmax(outputs, dim=1)
+            batch_counts = torch.bincount(
+                predictions.cpu(),
+                minlength=NUM_CLASSES,
+            )
+            prediction_counts = [
+                old_count + int(new_count)
+                for old_count, new_count in zip(prediction_counts, batch_counts)
+            ]
+
     epoch_loss = running_loss / total_samples
     epoch_accuracy = running_accuracy / total_samples
 
-    return epoch_loss, epoch_accuracy
+    return epoch_loss, epoch_accuracy, prediction_counts
 
 
 def save_best_model(
     model: EmotionCNN,
     class_names: List[str],
     save_path: Path,
+    input_size: int,
+    hidden_features: int,
 ) -> None:
     """Save the current best model for testing later."""
     checkpoint = {
         "model_state_dict": model.state_dict(),
         "class_names": class_names,
-        "input_size": IMAGE_SIZE,
-        "hidden_features": HIDDEN_FEATURES,
+        "input_size": input_size,
+        "hidden_features": hidden_features,
     }
     torch.save(checkpoint, save_path)
 
 
 def main() -> None:
     """Run the full training process."""
+    args = parse_args()
     set_seed(SEED)
     device = get_device()
 
     print(f"Using device: {device}")
+    print(f"Image size: {args.image_size}x{args.image_size}")
+    print(f"Batch size: {args.batch_size}")
+    print(f"Epochs: {args.epochs}")
+    print(f"Learning rate: {args.learning_rate}")
+    print(f"Hidden features: {args.hidden_features}")
+    print(f"Weight decay: {args.weight_decay}")
+    print(f"Label smoothing: {args.label_smoothing}")
+    print(f"Training augmentation: {'on' if args.use_augmentation else 'off'}")
     print("Loading training and validation data...")
 
-    train_dataset, val_dataset = load_datasets()
-    train_loader, val_loader = create_dataloaders(train_dataset, val_dataset)
+    train_dataset, val_dataset, class_names = load_datasets(
+        image_size=args.image_size,
+        max_train_samples=args.max_train_samples,
+        max_val_samples=args.max_val_samples,
+        use_augmentation=args.use_augmentation,
+    )
+    train_loader, val_loader = create_dataloaders(
+        train_dataset,
+        val_dataset,
+        batch_size=args.batch_size,
+    )
 
     model = EmotionCNN(
         num_classes=NUM_CLASSES,
-        input_size=IMAGE_SIZE,
-        hidden_features=HIDDEN_FEATURES,
+        input_size=args.image_size,
+        hidden_features=args.hidden_features,
     ).to(device)
 
     # CrossEntropyLoss fits this task because the model predicts
     # one class out of 4 possible emotion classes.
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
+    criterion = nn.CrossEntropyLoss(label_smoothing=args.label_smoothing)
+    optimizer = optim.Adam(
+        model.parameters(),
+        lr=args.learning_rate,
+        weight_decay=args.weight_decay,
+    )
 
-    model_output_dir = PROJECT_ROOT / "outputs" / "models"
     plots_output_dir = PROJECT_ROOT / "outputs" / "plots"
-    ensure_dir(model_output_dir)
+    ensure_dir(args.model_output_path.parent)
     ensure_dir(plots_output_dir)
 
-    best_model_path = model_output_dir / "best_model2.pth"
+    best_model_path = args.model_output_path
     best_val_accuracy = 0.0
 
     history = {
@@ -258,8 +401,8 @@ def main() -> None:
 
     print("\nTraining started...\n")
 
-    for epoch in range(NUM_EPOCHS):
-        print(f"Epoch {epoch + 1}/{NUM_EPOCHS}")
+    for epoch in range(args.epochs):
+        print(f"Epoch {epoch + 1}/{args.epochs}")
 
         train_loss, train_accuracy = train_one_epoch(
             model=model,
@@ -268,7 +411,7 @@ def main() -> None:
             optimizer=optimizer,
             device=device,
         )
-        val_loss, val_accuracy = validate_one_epoch(
+        val_loss, val_accuracy, val_prediction_counts = validate_one_epoch(
             model=model,
             dataloader=val_loader,
             criterion=criterion,
@@ -286,13 +429,20 @@ def main() -> None:
             f"Val Loss: {val_loss:.4f} | "
             f"Val Accuracy: {val_accuracy:.2f}%"
         )
+        prediction_summary = ", ".join(
+            f"{class_name}: {count}"
+            for class_name, count in zip(class_names, val_prediction_counts)
+        )
+        print(f"Validation predictions: {prediction_summary}")
 
         if val_accuracy > best_val_accuracy:
             best_val_accuracy = val_accuracy
             save_best_model(
                 model=model,
-                class_names=train_dataset.classes,
+                class_names=class_names,
                 save_path=best_model_path,
+                input_size=args.image_size,
+                hidden_features=args.hidden_features,
             )
             print("Validation accuracy improved, so I saved this model.")
             print(f"Saved to: {best_model_path}")
@@ -328,6 +478,11 @@ def main() -> None:
         title="Validation Accuracy vs Epochs",
         y_label="Accuracy (%)",
         save_path=plots_output_dir / "val_accuracy.png",
+    )
+    plot_accuracy_vs_iterations(
+        train_accuracies=history["train_accuracy"],
+        val_accuracies=history["val_accuracy"],
+        save_path=plots_output_dir / "model2" / "accuracy_vs_iterations_model2.png",
     )
 
     print("Training finished successfully.")

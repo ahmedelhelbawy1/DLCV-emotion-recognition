@@ -1,0 +1,21 @@
+Model 2 K-Fold Validation Results
+=================================
+
+Settings:
+- K value: 4
+- epochs per fold: 1
+- batch size: 8
+- image size: 512 x 512
+- learning rate: 0.001
+- total available training samples: 8410
+- samples used in K-fold: 4000
+
+Subset justification:
+A balanced subset of 1000 images per class was used to satisfy the project requirement while keeping K-fold validation feasible on a CPU-only machine.
+
+Fold 1 accuracy: 38.20%
+Fold 2 accuracy: 24.80%
+Fold 3 accuracy: 25.60%
+Fold 4 accuracy: 35.60%
+
+Average K-fold accuracy: 31.05%

@@ -1,0 +1,13 @@
+Model 2 Classification Report
+=============================
+
+              precision    recall  f1-score   support
+
+       angry     0.5310    0.6000    0.5634       100
+       happy     0.6966    0.6200    0.6561       100
+         sad     0.3837    0.3300    0.3548       100
+    surprise     0.6429    0.7200    0.6792       100
+
+    accuracy                         0.5675       400
+   macro avg     0.5635    0.5675    0.5634       400
+weighted avg     0.5635    0.5675    0.5634       400

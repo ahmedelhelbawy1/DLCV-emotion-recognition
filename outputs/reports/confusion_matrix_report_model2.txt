@@ -1,0 +1,17 @@
+Confusion Matrix Report
+=======================
+
+Meaning:
+- Main diagonal values are correct classifications.
+- Off-diagonal values are wrong classifications.
+- Rows represent actual classes.
+- Columns represent predicted classes.
+
+Class accuracies:
+- angry: 60.00%
+- happy: 62.00%
+- sad: 33.00%
+- surprise: 72.00%
+
+Overall accuracy: 56.75%
+Overall error rate: 43.25%

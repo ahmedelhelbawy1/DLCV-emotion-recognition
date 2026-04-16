@@ -1,0 +1,10 @@
+Model 2 Test Results
+====================
+Test Accuracy: 56.75%
+Number of Test Images Used: 400
+Full Test Dataset Size: 1205
+Classes: angry, happy, sad, surprise
+Saved Model Path: /Users/ahmedamrdodz/Desktop/MAIN DODZ/UNI/DLCV/DLCV_Emotion_Assignment/outputs/models/best_model2.pth
+Confusion Matrix Path: /Users/ahmedamrdodz/Desktop/MAIN DODZ/UNI/DLCV/DLCV_Emotion_Assignment/outputs/plots/confusion_matrix_model2.png
+Confusion Matrix Report Path: /Users/ahmedamrdodz/Desktop/MAIN DODZ/UNI/DLCV/DLCV_Emotion_Assignment/outputs/reports/confusion_matrix_report_model2.txt
+Classification Report Path: /Users/ahmedamrdodz/Desktop/MAIN DODZ/UNI/DLCV/DLCV_Emotion_Assignment/outputs/reports/classification_report.txt
