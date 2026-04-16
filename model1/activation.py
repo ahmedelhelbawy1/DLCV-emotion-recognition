@@ -1,8 +1,4 @@
-"""Activation functions for Model 1.
+import numpy as np
 
-Main owner:
-- Member 3
-
-Purpose:
-- define the activation logic used after convolution/pooling stages
-"""
+def relu(x):
+    return np.maximum(0, x)
