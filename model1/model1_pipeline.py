@@ -2,6 +2,7 @@ import os
 import sys
 import time
 import numpy as np
+from multiprocessing import Pool, cpu_count
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -99,6 +100,18 @@ def _load_image(path):
     return np.asarray(img, dtype=np.float32) / 255.0
 
 
+# Module-level worker state (one model copy per worker process)
+_worker_model = None
+
+def _init_worker(model):
+    global _worker_model
+    _worker_model = model
+
+def _worker_forward(path):
+    img = _load_image(path)
+    return _worker_model.forward(img)
+
+
 def _cache_path(split_name, limit):
     os.makedirs(_CACHE_DIR, exist_ok=True)
     tag = f"max{limit}" if limit else "full"
@@ -114,19 +127,19 @@ def extract_features(paths, labels, model, split_name,
         print(f"  Loading cached features from {feat_file}")
         return np.load(feat_file), np.load(lbl_file)
 
-    features = []
+    n_workers = max(1, cpu_count() - 2)
+    features = [None] * len(paths)
     t0 = time.time()
-    for i, path in enumerate(paths):
-        img  = _load_image(path)
-        feat = model.forward(img)
-        features.append(feat)
-
-        elapsed = time.time() - t0
-        done    = i + 1
-        remaining = (elapsed / done) * (len(paths) - done)
-        print(f"\r  {done}/{len(paths)}  "
-              f"elapsed {elapsed:.0f}s  "
-              f"eta {remaining:.0f}s   ", end='', flush=True)
+    with Pool(processes=n_workers,
+              initializer=_init_worker, initargs=(model,)) as pool:
+        for i, feat in enumerate(pool.imap(_worker_forward, paths)):
+            features[i] = feat
+            elapsed = time.time() - t0
+            done = i + 1
+            remaining = (elapsed / done) * (len(paths) - done)
+            print(f"\r  {done}/{len(paths)}  "
+                  f"elapsed {elapsed:.0f}s  "
+                  f"eta {remaining:.0f}s   ", end='', flush=True)
 
     print()
     X = np.array(features)
