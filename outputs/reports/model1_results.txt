@@ -1,0 +1,25 @@
+============================================================
+Model 1 Results - CNN from scratch + K-means
+per class  train=700  val=200  test=100
+total images: 4000
+============================================================
+
+Train accuracy: 0.2968  (830/2800)
+  angry      0.3143  (700 samples)
+  happy      0.0000  (700 samples)
+  sad        0.5157  (700 samples)
+  surprise   0.3571  (700 samples)
+
+Val accuracy: 0.2900  (231/800)
+  angry      0.2350  (200 samples)
+  happy      0.0000  (200 samples)
+  sad        0.5650  (200 samples)
+  surprise   0.3600  (200 samples)
+
+Test accuracy: 0.3050  (122/400)
+  angry      0.2800  (100 samples)
+  happy      0.0000  (100 samples)
+  sad        0.5500  (100 samples)
+  surprise   0.3900  (100 samples)
+
+============================================================
