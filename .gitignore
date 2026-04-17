@@ -5,4 +5,5 @@ outputs/models/*.pth
 outputs/models/*.pkl
 outputs/logs/
 outputs/predictions/
+outputs/model1_features/
 .ipynb_checkpoints/
